@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.venv-codex/
+.pytest_cache/
+.pytest_tmp/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Results never go into the repo (see src/uavapf/paths.py)
+results/
+*.npz
+
+# LaTeX build products
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.pdf
+paper/*.synctex.gz
+paper/*.bbl
+paper/*.blg
+paper/*.fls
+paper/*.fdb_latexmk
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local setup log written by scripts/setup.ps1
+setup-report.txt
