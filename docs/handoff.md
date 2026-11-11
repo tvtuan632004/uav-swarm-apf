@@ -3,6 +3,49 @@
 Newest entry on top. Every agent adds one entry before ending a session
 (format in AGENTS.md §5).
 
+## 2026-11-11 · T13b GitHub upload · Codex → Claude
+- Done: on the user's explicit request, committed the current T13b working tree and
+  documentation, added the public `tvtuan632004/uav-swarm-apf` remote (D011), and
+  pushed `main`. No source or test edits were made during the upload.
+- Tests: 312/312 green (`uv run --locked pytest -q` in `.venv-codex`);
+  `uv run --locked ruff check .`, `uv run --locked ruff format --check .`, and
+  `git diff --check` passed.
+- Open issues: T13b still needs independent review and a fresh tracking pilot. The
+  documented S1 pilot has 17% collision at a_max = 5, while T13b asks for zero;
+  D010 also needs to be reconciled with Remark 2 in `paper/main.tex`.
+- Next: run `scripts\setup.cmd` on the user's Windows environment, review T13b
+  against the spec and paper, rerun the pilot, then resolve S1 and Remark 2.
+
+## 2026-11-11 · status summary · Codex → Claude
+- Done: read-only project status summary for the user; no code or test changes.
+- Tests: not run (status summary only).
+- Open issues: working tree contains uncommitted T13b changes; T13b still needs verification and review, and the documented S1 pilot collision rate conflicts with its acceptance criterion.
+- Next: verify and review the existing changes, then reconcile the S1 criterion and paper wording.
+
+
+## 2026-11-11 · T13b status audit · Codex → Claude
+- Done: read-only project status audit for the user; found T13b implementation and tests
+  present but uncommitted in the working tree. No code or test changes.
+- Tests: not run (`uv` default cache denied access; isolated offline cache lacks numpy).
+  `git diff --check` passed.
+- Open issues: T13b implementation has no verified Windows test/pilot result or independent
+  review. Documented tracking pilot reports 17% S1 collision at a_max = 5, while the T13b
+  acceptance text asks for no collisions across S1–S4.
+- Next: run `scripts\setup.cmd` on Windows, review T13b against its spec and main.tex,
+  then rerun the tracking pilot and reconcile S1 acceptance and the paper remark.
+
+## 2026-10-12 · T13b spec + tests, D009, D010 · Claude → Codex
+- Done: user chose Q1 = moving formation centre (D009). Wrote `docs/specs/T13b-tracking.md`
+  and `tests/test_t13b_tracking.py` (17 tests, skipped until `uavapf.control.reference`
+  exists). A throwaway prototype (not in the repo) showed that with the T1 goal factor on
+  the *moving* slot agents ride their slot through obstacles or blow up; the user chose
+  D010 (T1 factor on the final slot). Prototype with D010: 312/312 green; the two D010
+  tests fail under the old rule (checked). Pilot with tracking in
+  `docs/pilot-2026-10-11.md` §Tracking. Proposed Remark-2 wording in `docs/paper-notes.md`.
+- Tests: repo code unchanged → 295 passed + 1 skipped file (T13b) expected.
+- Open issues: S1 forest and S3-U still fail for both methods (Q5); Remark 2 edit (Q6).
+- Next: Codex reviews the night-11/10 work, then implements T13b (prompt in plan §8).
+
 ## 2026-10-11 (night) · T05, T06, T11b, T11c, T12, T13-draft, pilot · Claude → Codex (review)
 - Context: the user went to sleep and asked Claude to do as much as possible; Codex was
   not running, so Claude wrote spec, tests AND code for every task below. **Each needs

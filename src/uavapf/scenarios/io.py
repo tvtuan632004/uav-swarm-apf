@@ -17,7 +17,7 @@ import numpy as np
 import yaml
 from numpy.typing import NDArray
 
-from uavapf.control import APFConfig, APFController
+from uavapf.control import APFConfig, APFController, StraightPath, TrackingController
 from uavapf.geometry import Cylinder, ObstacleSet, Sphere
 from uavapf.sim import SimConfig
 
@@ -25,7 +25,18 @@ FloatArray = NDArray[np.float64]
 Obstacle = Sphere | Cylinder
 
 FORMAT_VERSION = 1
-_TOP_KEYS = {"version", "name", "seed", "sim", "formation", "start", "obstacles", "controller"}
+_TOP_KEYS = {
+    "version",
+    "name",
+    "seed",
+    "sim",
+    "formation",
+    "start",
+    "obstacles",
+    "controller",
+    "reference",
+}
+_REFERENCE_KEYS = ("start", "speed", "accel")
 _TOP_REQUIRED = {"version", "name", "sim", "formation", "start"}
 _EDGE_SHORTHANDS = ("none", "chain", "ring", "complete")
 
@@ -55,6 +66,9 @@ class Scenario:
         Controller gains (Table 4 defaults unless overridden).
     seed : int or None
         Seed the scenario was generated from (T13), if any.
+    reference : StraightPath or None
+        Moving formation centre (T13b, D009); its ``goal`` is the centroid of ``slots``.
+        ``None``: static slots.
     """
 
     name: str
@@ -66,6 +80,7 @@ class Scenario:
     sim: SimConfig
     controller: APFConfig
     seed: int | None = None
+    reference: StraightPath | None = None
 
     @property
     def n_agents(self) -> int:
@@ -76,8 +91,16 @@ class Scenario:
         """Vectorised obstacle collection for geometry and metrics."""
         return ObstacleSet(self.obstacles)
 
-    def build_controller(self) -> APFController:
-        """APF controller for this scenario (validates slot feasibility)."""
+    def build_controller(self) -> APFController | TrackingController:
+        """APF controller for this scenario (validates slot feasibility).
+
+        A :class:`TrackingController` when ``reference`` is set, else an
+        :class:`APFController`.
+        """
+        if self.reference is not None:
+            return TrackingController(
+                self.slots, self.edges, self.obstacles, self.reference, self.controller
+            )
         return APFController(self.slots, self.edges, self.obstacles, self.controller)
 
 
@@ -178,6 +201,21 @@ def _obstacle(item: Any, k: int) -> Obstacle:
     raise ValueError(f"unknown obstacle type '{kind}' in '{where}' (use 'sphere' or 'cylinder')")
 
 
+def _reference(value: Any, slots: FloatArray) -> StraightPath:
+    data = _mapping(value, "reference")
+    _check_keys(data, _REFERENCE_KEYS, _REFERENCE_KEYS, "reference")
+    start = _points([data["start"]], "reference.start")[0]
+    for key in ("speed", "accel"):
+        if isinstance(data[key], bool) or not isinstance(data[key], int | float):
+            raise ValueError(f"'reference.{key}' must be a number")
+    return StraightPath(
+        start=tuple(start),
+        goal=tuple(slots.mean(axis=0)),
+        v_ref=data["speed"],
+        a_ref=data["accel"],
+    )
+
+
 def _check_free_start(p0: FloatArray, obstacles: ObstacleSet, d_min: float) -> None:
     """Assumption 4 of main.tex: p(0) in the free set."""
     if len(obstacles):
@@ -236,6 +274,10 @@ def scenario_from_dict(data: Mapping[str, Any]) -> Scenario:
     if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
         raise ValueError("'seed' must be an integer or null")
 
+    reference = None
+    if data.get("reference") is not None:
+        reference = _reference(data["reference"], slots)
+
     scenario = Scenario(
         name=str(data["name"]),
         slots=slots,
@@ -246,6 +288,7 @@ def scenario_from_dict(data: Mapping[str, Any]) -> Scenario:
         sim=SimConfig(**sim),
         controller=controller,
         seed=seed,
+        reference=reference,
     )
     _check_free_start(p0, scenario.obstacle_set(), controller.d_min)
     return scenario
@@ -265,7 +308,7 @@ def _obstacle_to_dict(ob: Obstacle) -> dict[str, Any]:
 
 def scenario_to_dict(scenario: Scenario) -> dict[str, Any]:
     """Plain, YAML-safe mapping; ``scenario_from_dict`` of it gives back an equal scenario."""
-    return {
+    out: dict[str, Any] = {
         "version": FORMAT_VERSION,
         "name": scenario.name,
         "seed": scenario.seed,
@@ -278,6 +321,10 @@ def scenario_to_dict(scenario: Scenario) -> dict[str, Any]:
         "obstacles": [_obstacle_to_dict(ob) for ob in scenario.obstacles],
         "controller": asdict(scenario.controller),
     }
+    if scenario.reference is not None:
+        ref = scenario.reference
+        out["reference"] = {"start": list(ref.start), "speed": ref.v_ref, "accel": ref.a_ref}
+    return out
 
 
 def load_scenario(path: Path | str) -> Scenario:

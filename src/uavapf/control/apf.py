@@ -197,13 +197,27 @@ class APFController:
             raise ValueError("p and v must be finite")
         return p, v
 
-    def components(self, p: ArrayLike, v: ArrayLike) -> ControlComponents:
+    def slots_at(self, t: float) -> FloatArray:
+        """Slots p*(t) in m; static here (see ``TrackingController`` for a moving centre)."""
+        return self.slots
+
+    def slot_velocity(self, t: float) -> FloatArray:
+        """Slot velocities in m/s; zeros (N, 3) for static slots."""
+        return np.zeros_like(self.slots)
+
+    def components(
+        self, p: ArrayLike, v: ArrayLike, *, slots: ArrayLike | None = None
+    ) -> ControlComponents:
         """Return potential, conservative force, PSD damping and gyroscopic acceleration.
 
         Parameters
         ----------
         p, v : array_like, shape (N, 3)
             Positions in m and velocities in m/s.
+        slots : array_like, shape (N, 3), optional
+            Current (moving) slots p*(t) in m for the attraction and the gyroscopic goal
+            term. The T1 goal factor and the Morse desired distances always use the final
+            ``self.slots`` (D010). Default: ``self.slots``.
 
         Returns
         -------
@@ -212,12 +226,20 @@ class APFController:
         """
         p, v = self.validate_state(p, v)
         c = self.config
-        delta = p - self.slots
+        if slots is None:
+            target = self.slots
+        else:
+            target = np.asarray(slots, dtype=np.float64)
+            if target.shape != self.slots.shape or not np.isfinite(target).all():
+                raise ValueError("slots must be finite with the same (N, 3) shape as p")
+        delta = p - self.slots  # to the final slot: T1 goal factor (D010)
+        track = delta if slots is None else p - target  # to the current slot p*(t)
         g2 = np.einsum("ij,ij->i", delta, delta)
         g = np.sqrt(g2)
+        track2 = g2 if slots is None else np.einsum("ij,ij->i", track, track)
         # eq. (4), main.tex
-        potential = 0.5 * c.ka * float(g2.sum())
-        force = -c.ka * delta
+        potential = 0.5 * c.ka * float(track2.sum())
+        force = -c.ka * track
         damping = c.ka * v  # eq. (12), main.tex (new array)
         omega = np.zeros_like(p)
 
@@ -271,7 +293,7 @@ class APFController:
                 # eq. (13), main.tex: smoothstep activation and work-free gyro force.
                 s = np.clip((c.rho0 - rho) / (c.rho0 - c.rho1), 0.0, 1.0)
                 beta = s * s * (3.0 - 2.0 * s)
-                term = _cross(-d, normal)
+                term = _cross(-track[ni], normal)
                 term[:, 2] += c.mu
                 _scatter_add(omega, ni, (c.kg * beta)[:, None] * term)
 

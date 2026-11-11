@@ -27,14 +27,14 @@ nhất cho mọi công thức.** Code luôn trích số phương trình tương 
 8. [Thư mục kết quả](#8-thư-mục-kết-quả-uavapf_results)
 9. [Quy trình Claude + Codex](#9-quy-trình-claude--codex)
 10. [Quy ước code](#10-quy-ước-code)
-11. [Git](#11-git-chỉ-trên-máy-không-github--d008)
+11. [Git](#11-git)
 12. [Xử lý sự cố](#12-xử-lý-sự-cố)
 
 ---
 
 ## 1. Trạng thái
 
-Bảng nhiệm vụ, vai trò và lịch đầy đủ: **`docs/plan.md`**. Tóm tắt (sáng 11/10/2026):
+Bảng nhiệm vụ, vai trò và lịch đầy đủ: **`docs/plan.md`**. Tóm tắt (11/11/2026):
 
 | Mã | Nhiệm vụ | Trạng thái |
 |---|---|---|
@@ -42,9 +42,11 @@ Bảng nhiệm vụ, vai trò và lịch đầy đủ: **`docs/plan.md`**. Tóm 
 | T07–T11 | Bộ điều khiển APF T1–T4 + reset (`uavapf.control`) | Xong, đã review độc lập |
 | T05, T06, T11b, T11c, T12 | YAML + hình, baseline B1, va chạm là kết quả, tăng tốc, 7 chỉ số | Xong trong đêm, chờ Codex review |
 | T13 | Sinh S1–S5 theo seed | Bản nháp, chờ chốt tham số |
-| T13b–T20 | Tâm đội hình di chuyển, B2–B5, Monte Carlo, tinh chỉnh, PX4 | Chưa làm |
+| T13b | Tâm đội hình di chuyển | Code và test đã có; chờ pilot và review |
+| T14–T20 | B2–B5, Monte Carlo, tinh chỉnh, PX4 | Chưa làm |
 
-Kiểm tra hiện tại: **295 test xanh** (Linux). Kết quả pilot APF so với B1:
+Kiểm tra hiện tại: **312 test xanh** (Windows, `.venv-codex`); lint và format sạch.
+Kết quả pilot APF so với B1:
 `docs/pilot-2026-10-11.md`.
 
 ---
@@ -349,14 +351,14 @@ Chỉ đặt cho phiên hiện tại: `$env:UAVAPF_RESULTS = "D:\uav_results"`.
 
 Chi tiết nằm trong `AGENTS.md`. Tóm tắt:
 
-1. **Một nhiệm vụ = một nhánh = một PR nhỏ** (dưới khoảng 400 dòng), tên nhánh như
-   `T07-gnron-repulsion`.
+1. **Một nhiệm vụ = một thay đổi nhỏ, dễ review** (mục tiêu dưới khoảng 400 dòng).
 2. **Người viết test khác người viết code.** Mặc định: Claude viết spec
    (`docs/specs/`) và test (`tests/`), Codex viết code, Claude review. T09–T11 đảo vai.
 3. Người cài đặt **không sửa `tests/`**. Nếu thấy test sai, ghi lý do vào
    `docs/handoff.md`.
 4. Trước khi kết thúc phiên, AI nào cũng thêm một mục lên **đầu** `docs/handoff.md`.
-5. Không AI nào push thẳng `main` hay tự merge. Chỉ bạn merge, qua PR có CI xanh.
+5. Thông thường bạn tự commit sau khi `setup.cmd` báo `ALL DONE`. Agent chỉ commit hoặc
+   push khi bạn yêu cầu tường minh cho lượt đó (D011).
 
 > **Ngoại lệ hiện tại:** T01, T03 và T04 do Claude viết cả code lẫn test (theo yêu cầu
 > trực tiếp). Vì vậy bước tiếp theo là để **Codex review cả ba**. Codex được phép
@@ -395,7 +397,11 @@ Bốn mẫu prompt cho vòng thường (spec → code → review → sửa) nằ
 
 ---
 
-## 11. Git (chỉ trên máy, không GitHub — D008)
+## 11. Git
+
+Remote GitHub: `https://github.com/tvtuan632004/uav-swarm-apf.git` (D011, thay D008).
+Repo hiện công khai. Người dùng thường tự commit sau khi `setup.cmd` báo `ALL DONE`;
+agent chỉ commit/push khi được yêu cầu tường minh.
 
 Lần đầu:
 
@@ -417,7 +423,7 @@ git commit -m "T05 Codex: implement scenarios"      # mã nhiệm vụ + ai + vi
 Xem AI vừa sửa gì: `git status`, `git diff`. Quay lại bản trước nếu cần:
 `git restore <file>` (một file) hoặc `git reset --hard HEAD` (bỏ mọi thay đổi chưa commit).
 
-`.github/workflows/ci.yml` vẫn để trong repo, phòng khi sau này có remote; hiện không dùng.
+`.github/workflows/ci.yml` sẽ chạy khi có sự kiện GitHub phù hợp.
 File `.gitattributes` ép xuống dòng LF (riêng `.ps1`, `.cmd` dùng CRLF), để diff không
 bị nhiễu khi chuyển giữa Windows và Ubuntu ở giai đoạn PX4.
 

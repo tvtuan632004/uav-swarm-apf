@@ -1,20 +1,23 @@
-# Kế hoạch code và thực nghiệm (bản 2.1): Claude + Codex
+# Kế hoạch code và thực nghiệm (bản 2.2): Claude + Codex
 
-Cập nhật sáng 11/10/2026, sau đêm làm việc của Claude. Thay thế bản 2 (01:20 cùng ngày).
+Cập nhật 11/11/2026: D011 thay D008; repo có remote GitHub. T13b đã có code và 312 test
+qua trên Windows, vẫn chờ review độc lập và chạy lại pilot. Các mốc bên dưới là kế hoạch cũ.
 File này là nguồn chuẩn cho bảng nhiệm vụ; AGENTS.md trỏ về đây.
 
 ## 1. Tình hình hiện tại
 
-- Repo `C:\Setup\UAV`, **chỉ dùng git trên máy, không GitHub** (D008). Kiểm tra: 295 test
-  xanh trên Linux (bản sao của Claude); trên Windows lần cuối 111/111 trước đêm nay,
-  cần bạn chạy lại `setup.cmd`.
+- Repo `C:\Setup\UAV`, remote `https://github.com/tvtuan632004/uav-swarm-apf.git`
+  (D011). Kiểm tra hiện tại: 312 test xanh, lint và format sạch trên Windows trong
+  môi trường `.venv-codex`; `setup.cmd` của người dùng chưa chạy lại cho T13b.
 - Xong trong đêm (Claude viết cả spec, test và code, **Codex cần review**):
   T11b (va chạm là kết quả), T05 (YAML, chạy một lệnh, hình, GIF), T11c (controller
   nhanh gấp 6 lần), T12 (7 chỉ số), T06 (baseline B1 Khatib, tái hiện GNRON và kẹt),
   T13 bản nháp (sinh S1–S5 theo seed), và một **pilot** APF so với B1 (168 lượt chạy).
-- Pilot (`docs/pilot-2026-10-11.md`): khi không bão hòa, APF hơn B1 rõ ở S2, S3, S4, S5;
-  với a_max = 5 m/s² gần như mọi lượt đều va chạm, do slot đứng yên ở xa làm bầy bay
-  ~10 m/s. **Cần quyết Q1 (mục 6) trước khi làm tiếp T13–T18.**
+- Đã commit `5b9e67e` (295 test xanh trên Windows).
+- Q1 đã quyết: **tâm đội hình di chuyển** (D009). Thử bằng bản nháp cho thấy phải tính hệ số
+  gⁿ của T1 theo **slot đích** (D010), nếu không UAV bám slot sẽ đi xuyên vật cản. Với D010:
+  S1–S4, a_max = 5, APF không còn va chạm ở S2–S4; thành công S2 83 %, S3 100 %, S4 50 %
+  (`docs/pilot-2026-10-11.md` §Tracking). Code và test T13b đã có, chờ pilot và review.
 
 ## 2. Vòng làm việc
 
@@ -49,7 +52,7 @@ Trạng thái: ✅ xong · 🔶 xong code, chờ review chéo · 📝 spec+test 
 | T11c | Controller thưa (chỉ cặp đang tác động) | Claude | Claude | Codex | N=50, M=20 ≤ 1 ms (đạt 0,38–0,44 ms) | 🔶 |
 | T12 | 7 chỉ số đánh giá | Claude | Claude | Codex | Khớp tính tay | 🔶 |
 | T13 | Sinh S1–S5 theo seed (bản nháp v0) | Claude | Claude | Codex | Cùng seed cùng kịch bản; mỗi S có đúng khuyết tật | 🔶 ❓ tham số |
-| **T13b** | **Tâm đội hình di chuyển (Remark tracking), nếu chọn Q1(a)** | Claude | Codex | Claude | a_max = 5 không còn va chạm hàng loạt trong pilot | ❓ Q1 |
+| **T13b** | **Tâm đội hình di chuyển (D009) + T1 theo slot đích (D010)** | Claude | Codex | Claude | 17 test xanh; pilot S1–S4 APF a_max = 5 không va chạm | 🔶 code/test xanh, chờ pilot + review |
 | T14 | Baseline B2 Olfati-Saber | Claude | Codex | Claude | Tái hiện lưới α như bài gốc | ⬜ |
 | T15 | B3 (Hessian đầy đủ), B4 (HOCBF-QP, OSQP), B5 (ORCA) | Claude | Codex | Claude | Cả ba chạy trên S1–S5 không lỗi | ⬜ |
 | T16 | Runner Monte Carlo (từ `scripts/pilot.py`) + lưu config, seed, commit | Claude | Codex | Claude | 500 lượt tái lập từ một lệnh | ⬜ |
@@ -80,32 +83,31 @@ Nếu trễ: cắt B5 trước, rồi thu hẹp ablation. Mốc 31/1 như đề 
 - **D005** Va chạm là kết quả: controller kẹp ρ và r − d_min ở 1 mm; metrics ghi nhận.
 - **D006** Hai chế độ bão hòa + quét a_max ∈ {2, 5, 10, ∞}.
 - **D007** Luân phiên; Codex dùng `.venv-codex`, `.pytest_tmp/codex`.
-- **D008** Không dùng GitHub: git trên máy; xác nhận bằng `setup.cmd` (Windows) và bản
-  chạy Linux của Claude. `.github/workflows/ci.yml` giữ lại nhưng không bắt buộc.
+- **D008** Quyết định cũ không dùng GitHub; đã được D011 thay thế.
+- **D009** Tâm đội hình đi theo quỹ đạo tham chiếu minimum-jerk (1,5 m/s; 0,5 m/s²), luật
+  Remark 2; S5 giữ slot cố định; B1 dùng cùng quỹ đạo.
+- **D010** Khi tâm di chuyển, hệ số gⁿ của T1 đo tới slot đích; lực hút bám slot di chuyển.
+  Cần sửa Remark 2 trong bài (đề xuất câu chữ: `docs/paper-notes.md`).
+- **D011** Repo GitHub công khai `tvtuan632004/uav-swarm-apf`; agent chỉ commit/push khi
+  người dùng yêu cầu tường minh.
 
-## 6. Câu hỏi cần bạn quyết (chi tiết: `docs/pilot-2026-10-11.md`)
+## 6. Câu hỏi còn mở
 
-1. **Q1 — tốc độ tiếp cận.** (a) Tâm đội hình di chuyển với tốc độ giới hạn (đề xuất);
-   (b) rút ngắn quãng đường; (c) thêm giới hạn tốc độ v_max.
-2. **Q2 — bước tích phân.** Nếu chọn (a) thì dt = 0,01 s có lẽ đủ; nếu không, giảm dt.
-3. **Q3 — B1 đẩy cặp theo r (cổ điển) hay r − d_min (công bằng hơn với tiêu chí d_min).**
-4. **Q4 — tham số T13** (mật độ rừng 3/6/10 cây/100 m², hành lang 50 % bề rộng, L = 20 m).
+1. ~~Q1~~ đã quyết (D009 + D010). ~~Q2~~: với tâm di chuyển, tốc độ ≤ 7 m/s, dt = 0,01 s đủ
+   (riêng S5 hai nhóm vẫn cần xem lại).
+2. **Q3 — B1 đẩy cặp theo r (cổ điển) hay r − d_min.**
+3. **Q4 — tham số T13** (mật độ rừng, hành lang, L = 20 m).
+4. **Q5 (mới) — S1 rừng và S3 chữ U**: cả hai phương pháp đều kém (UAV kẹt sau cây, 10–25
+   lần reset). Chờ tinh chỉnh (T17) hay cần quy tắc thoát mạnh hơn — nên hỏi thầy.
+5. **Q6 (mới) — sửa Remark 2 trong `main.tex`** theo D010 (bản đề xuất trong `docs/paper-notes.md`).
 
-## 7. Việc của bạn sáng nay
+## 7. Việc của bạn
 
-1. Bấm đúp `scripts\setup.cmd` → mong đợi **295 passed**, demo, `ALL DONE`.
-2. Commit:
-   ```
-   cd C:\Setup\UAV
-   git init -b main          (nếu chưa)
-   git add .
-   git commit -m "Night 11/10: T05 T06 T11b T11c T12 T13-draft, pilot"
-   ```
-3. Xem `results\scenarios\demo_sphere\anim.gif` (chạy
-   `uv run python scripts\run_scenario.py configs\scenarios\demo_sphere.yaml`).
-4. Trả lời Q1–Q4. 5. Giao Codex review (prompt mục 8).
+1. Bấm `scripts\setup.cmd` để xác nhận T13b trên môi trường người dùng (mong đợi 312 test qua).
+2. Giao Claude review T13b; chạy lại pilot và xử lý tiêu chí va chạm S1 trước khi coi là xong.
+3. Trả lời Q3–Q6 khi tiện.
 
-## 8. Mẫu prompt cho Codex
+## 8. Mẫu prompt cho Codex (lưu từ kế hoạch cũ)
 
 Mở đầu chung:
 ```
@@ -124,7 +126,15 @@ tests/test_*_codex.py, never edit existing ones. Findings as blocking / should f
 nit with file:line, a verdict per task, then a handoff entry.
 ```
 
-Cài đặt (bước 3) và sửa theo review (bước 6): như bản 2 — `Implement docs/specs/<Txx>.md
+Cài đặt T13b:
+```
+Implement docs/specs/T13b-tracking.md exactly (D009, D010 in docs/decisions.md).
+Do not edit anything under tests/. If a test looks wrong, stop and explain in
+docs/handoff.md. Done means: uv run pytest -q shows 0 failed and 0 skipped, ruff clean,
+and `uv run python scripts/pilot.py --seeds 3 --n 5 10` table pasted into the handoff.
+```
+
+Cài đặt việc khác (bước 3) và sửa theo review (bước 6): như bản 2 — `Implement docs/specs/<Txx>.md
 exactly …` / `Fix every "blocking" and "should fix" item …`; xong = 0 failed, 0 skipped,
 ruff sạch, có mục handoff.
 

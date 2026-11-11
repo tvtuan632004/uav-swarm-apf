@@ -65,8 +65,10 @@ def evaluate_run(
     ----------
     traj : Trajectory
         Logged run (use ``log_every = 1`` for paper numbers).
-    slots : array_like, shape (N, 3)
-        Formation slots p_i* in m (stationary centre, Assumption 3).
+    slots : array_like, shape (N, 3) or (K, N, 3)
+        Formation slots p_i* in m: stationary (Assumption 3) or one set per logged
+        sample (moving centre, T13b). Completion time is measured to the last sample's
+        slots, the final formation.
     obstacles : ObstacleSet
         Static obstacles of the scenario.
     d_min : float
@@ -80,7 +82,7 @@ def evaluate_run(
     """
     slots = np.asarray(slots, dtype=np.float64)
     t, p, u = traj.t, traj.p, traj.u
-    if p.ndim != 3 or slots.shape != p.shape[1:]:
+    if p.ndim != 3 or slots.shape not in (p.shape[1:], p.shape):
         raise ValueError(f"slots {slots.shape} do not match trajectory agents {p.shape[1:]}")
     if t.shape[0] < 2:
         raise ValueError("need at least two logged samples")
@@ -96,7 +98,9 @@ def evaluate_run(
     collided = bool(np.any(clearance <= 0.0) or np.any(separation <= d_min))
 
     err = np.linalg.norm(p - slots, axis=2)  # (K, N)
-    arrived = np.flatnonzero(np.all(err <= eps_p, axis=1))
+    final = slots if slots.ndim == 2 else slots[-1]
+    err_final = err if slots.ndim == 2 else np.linalg.norm(p - final, axis=2)
+    arrived = np.flatnonzero(np.all(err_final <= eps_p, axis=1))
     completion = float(t[arrived[0]] - t[0]) if arrived.size else math.inf
     deadline = duration if t_max is None else float(t_max)
     success = (not collided) and completion <= deadline

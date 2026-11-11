@@ -2,7 +2,24 @@
 
 3–5 lines per entry, newest on top.
 
-## 2026-10-11 · D008 · No GitHub: local git only
+## 2026-11-11 · D011 · GitHub remote for project backup
+The user explicitly requested an upload to `tvtuan632004/uav-swarm-apf`, superseding
+D008's no-remote decision. The repository is public. Routine agent turns still leave
+commits to the human unless the human explicitly requests a commit or push.
+
+## 2026-10-11 · D010 · Under tracking, the T1 goal factor uses the final slot
+With g_i measured to the moving slot p_i*(t), an agent riding its slot has g_i ≈ 0 and the
+T1 repulsion vanishes (it followed a slot through an obstacle), and an agent held back
+sees g_i^n explode (blow-ups also at dt = 0.001 s). g_i = ‖p_i − p_i^goal‖ keeps the GNRON
+fix at the final formation and makes U_r time-invariant. Prototype: S1–S4 success 8 % → 75 %,
+collisions 92 % → 0 %. Static case unchanged. Needs a matching edit of Remark 2 (paper).
+
+## 2026-10-11 · D009 · Moving formation centre for the main experiments (user, Q1)
+The centre follows a straight minimum-jerk reference (v_ref = 1.5 m/s, a_ref = 0.5 m/s²)
+from the start to the goal centroid, with the Remark-2 law (feed-forward c̈, e = v − ċ).
+S5 keeps static slots. B1 gets the same reference for a fair comparison (T13b).
+
+## 2026-10-11 · D008 · No GitHub: local git only (superseded by D011)
 The user does not want a remote. History lives in local git; the human commits between
 agent turns. Verification = `scripts\setup.cmd` on Windows + Claude's Linux run.
 `.github/workflows/ci.yml` stays in the repo (harmless, ready if a remote is added later).

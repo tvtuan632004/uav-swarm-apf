@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from uavapf.control.apf import APFController
+from uavapf.control.tracking import TrackingController
 
 FloatArray = NDArray[np.float64]
 
@@ -41,10 +42,16 @@ class StallReset:
     """Explicit reset state for one simulation, sampled at each RK4 step.
 
     Construct a new instance for each run. The continuous-time trigger in eq. (16)
-    is approximated at the simulator's step times.
+    is approximated at the simulator's step times. With a moving centre (T13b) the
+    position test and the reset direction use the current slot p*(t); the speed test
+    stays on the absolute speed.
     """
 
-    def __init__(self, controller: APFController, config: ResetConfig | None = None) -> None:
+    def __init__(
+        self,
+        controller: APFController | TrackingController,
+        config: ResetConfig | None = None,
+    ) -> None:
         self.controller = controller
         self.config = ResetConfig() if config is None else config
         n = len(controller.slots)
@@ -71,8 +78,9 @@ class StallReset:
             raise ValueError("t must be finite and nonnegative")
         p, v = self.controller.validate_state(p, v)
         c = self.config
+        target = self.controller.slots_at(t)
         stalled = (np.linalg.norm(v, axis=1) <= c.speed_tol) & (
-            np.linalg.norm(p - self.controller.slots, axis=1) >= c.position_tol
+            np.linalg.norm(p - target, axis=1) >= c.position_tol
         )
         self.stall_since[~stalled] = np.nan
         newly_stalled = stalled & np.isnan(self.stall_since)
@@ -89,9 +97,9 @@ class StallReset:
 
         # eq. (16), main.tex: closest sensed obstacle normal and gyro axis.
         rho, normal = self.controller.geometry.distance(p)
-        omega = self.controller.components(p, v).omega
+        omega = self.controller.components(p, v, slots=target).omega
         axis = np.array([0.0, 0.0, 1.0])
-        goal = self.controller.slots - p
+        goal = target - p
         direction = np.cross(axis, goal)
         if rho.shape[1]:
             nearest = np.argmin(rho, axis=1)

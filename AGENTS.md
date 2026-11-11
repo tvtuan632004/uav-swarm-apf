@@ -39,8 +39,9 @@ Python 3.12, dependencies managed only through `uv` (`uv add <pkg>`, never `pip 
   `UAVAPF_RESULTS` (see `src/uavapf/paths.py`), default `./results/`.
 
 ## 4. Workflow
-1. One task = one small, reviewable change (target < ~400 changed lines), committed
-   by the human in local git (no remote, D008). Commit message starts with the task code.
+1. One task = one small, reviewable change (target < ~400 changed lines), normally
+   committed by the human. The GitHub remote is recorded in D011. Commit messages
+   start with the task code.
 2. Roles per task are in the task table (`docs/plan.md`, section 3). Default:
    Claude writes spec + tests, Codex implements, Claude reviews. Codex writes a
    spec only when the user asks for it explicitly.
@@ -48,8 +49,9 @@ Python 3.12, dependencies managed only through `uv` (`uv add <pkg>`, never `pip 
    it. If a test looks wrong, stop and explain why in `docs/handoff.md`.
 4. Tests and lint must be green before asking for review. Review is done
    against the spec, not against taste.
-5. Never commit, push or rewrite git history yourself. Only the human commits, after
-   `scripts\setup.cmd` reports ALL DONE.
+5. Never commit, push or rewrite git history yourself unless the human explicitly
+   requests that action for the current turn. Otherwise only the human commits,
+   after `scripts\setup.cmd` reports ALL DONE.
 6. Never run two agents in the same working directory at the same time. For
    parallel work use separate `git worktree`s.
 7. No tokens, keys or passwords in the repo or in prompts.

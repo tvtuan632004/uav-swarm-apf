@@ -15,6 +15,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from uavapf.control.reference import StraightPath
+from uavapf.control.tracking import moving_slot_velocity, moving_slots
 from uavapf.geometry import Cylinder, ObstacleSet, Sphere
 
 FloatArray = NDArray[np.float64]
@@ -56,6 +58,9 @@ class KhatibController:
     obstacles : sequence of Sphere or Cylinder
         Static obstacles (capped cylinders allowed).
     config : KhatibConfig, optional
+    path : StraightPath, optional
+        Moving formation centre (T13b, D009); then
+        ``u = c̈ - grad U(p; p*(t)) - kd (v - ċ)`` with p*(t) = c(t) + slots - goal.
     """
 
     def __init__(
@@ -63,8 +68,10 @@ class KhatibController:
         slots: ArrayLike,
         obstacles: Sequence[Sphere | Cylinder],
         config: KhatibConfig | None = None,
+        path: StraightPath | None = None,
     ) -> None:
         self.config = KhatibConfig() if config is None else config
+        self.path = path
         q = np.array(slots, dtype=np.float64, copy=True)
         if q.ndim != 2 or q.shape[1] != 3 or q.shape[0] < 1 or not np.isfinite(q).all():
             raise ValueError("slots must be finite with shape (N, 3), N >= 1")
@@ -76,13 +83,27 @@ class KhatibController:
             raise ValueError("each slot must lie outside every obstacle")
         self.ii, self.jj = np.triu_indices(len(q), k=1)
 
-    def _terms(self, p: ArrayLike, v: ArrayLike | None) -> tuple[float, FloatArray]:
+    def slots_at(self, t: float | ArrayLike) -> FloatArray:
+        """Slots p*(t) in m at time ``t`` in s (static without a path)."""
+        if self.path is None:
+            return self.slots
+        return moving_slots(self.slots, self.path, t)
+
+    def slot_velocity(self, t: float | ArrayLike) -> FloatArray:
+        """Slot velocities ṗ*(t) in m/s at time ``t`` in s."""
+        if self.path is None:
+            return np.zeros_like(self.slots)
+        return moving_slot_velocity(len(self.slots), self.path, t)
+
+    def _terms(
+        self, p: ArrayLike, v: ArrayLike | None, slots: FloatArray | None = None
+    ) -> tuple[float, FloatArray]:
         p = np.asarray(p, dtype=np.float64)
         if p.shape != self.slots.shape or not np.isfinite(p).all():
             raise ValueError("p must be finite with the same (N, 3) shape as slots")
         c = self.config
         n = p.shape[0]
-        delta = p - self.slots
+        delta = p - (self.slots if slots is None else slots)
         potential = 0.5 * c.ka * float(np.sum(delta * delta))  # eq. (4), main.tex
         force = -c.ka * delta
 
@@ -130,4 +151,8 @@ class KhatibController:
 
     def __call__(self, t: float, p: ArrayLike, v: ArrayLike) -> FloatArray:
         """Acceleration command in m/s² at time ``t`` in s."""
-        return self._terms(p, v)[1]
+        if self.path is None:
+            return self._terms(p, v)[1]
+        # T13b: same tracking law as Remark 2 without the T2-T4 terms.
+        e = np.asarray(v, dtype=np.float64) - self.path.velocity(t)
+        return self.path.acceleration(t) + self._terms(p, e, self.slots_at(t))[1]

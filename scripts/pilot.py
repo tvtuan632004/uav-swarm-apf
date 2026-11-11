@@ -2,9 +2,10 @@
 
 NOT the paper experiment (that is T16-T18 with 500 runs per cell and tuned gains). This
 is a quick sanity check with untuned Table-4 gains on a few seeds, in both saturation
-regimes of D006. Writes one CSV row per run to $UAVAPF_RESULTS/pilot/pilot.csv.
+regimes of D006. S1-S4 use the moving formation centre (T13b, D009) unless --static.
+Writes one CSV row per run to $UAVAPF_RESULTS/pilot/pilot.csv (pilot_static.csv).
 
-Run: uv run python scripts/pilot.py [--seeds 3] [--n 5 10] [--workers 2]
+Run: uv run python scripts/pilot.py [--seeds 3] [--n 5 10] [--workers 2] [--static]
 """
 
 from __future__ import annotations
@@ -38,8 +39,10 @@ EPS_P = 0.3  # m, Table 4
 
 
 def one_run(job: tuple) -> dict:
-    sid, variant, method, n, seed, a_max = job
+    sid, variant, method, n, seed, a_max, static = job
     params = dataclasses.replace(GeneratorParams(), a_max=a_max)
+    if static:
+        params = dataclasses.replace(params, ref_speed=None)
     scn = make_scenario(sid, n, seed, variant=variant, formation="wedge", params=params)
     geo = scn.obstacle_set()
     d_min = scn.controller.d_min
@@ -47,7 +50,7 @@ def one_run(job: tuple) -> dict:
         ctrl = scn.build_controller()
         reset = StallReset(ctrl)
     else:
-        ctrl = KhatibController(scn.slots, scn.obstacles)
+        ctrl = KhatibController(scn.slots, scn.obstacles, path=scn.reference)
         reset = None
 
     def stop(t, p, v):
@@ -59,7 +62,8 @@ def one_run(job: tuple) -> dict:
     t0 = time.perf_counter()
     traj = simulate(ctrl, scn.p0, scn.v0, scn.sim, stop=stop, reset=reset)
     wall = time.perf_counter() - t0
-    m = evaluate_run(traj, scn.slots, geo, d_min=d_min, eps_p=EPS_P, a_max=a_max)
+    slots_t = ctrl.slots_at(traj.t)  # (K, N, 3) moving, (N, 3) static
+    m = evaluate_run(traj, slots_t, geo, d_min=d_min, eps_p=EPS_P, a_max=a_max)
     row = {
         "scenario": sid if variant is None else f"{sid}-{variant}",
         "method": method,
@@ -78,17 +82,19 @@ def main() -> None:
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--n", type=int, nargs="+", default=[5, 10])
     ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--static", action="store_true", help="static slots (pre-T13b)")
     args = ap.parse_args()
 
     jobs = [
-        (sid, var, method, n, seed, a_max)
+        (sid, var, method, n, seed, a_max, args.static)
         for sid, var in CASES
         for method in ("apf", "b1")
         for n in args.n
         for seed in range(args.seeds)
         for a_max in (5.0, None)
     ]
-    out = ensure_dir(results_root() / "pilot") / "pilot.csv"
+    name = "pilot_static.csv" if args.static else "pilot.csv"
+    out = ensure_dir(results_root() / "pilot") / name
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         rows = list(pool.map(one_run, jobs, chunksize=2))
     with Path(out).open("w", newline="", encoding="utf-8") as fh:

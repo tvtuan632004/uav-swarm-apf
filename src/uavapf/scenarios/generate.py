@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
-from uavapf.control import APFConfig
+from uavapf.control import APFConfig, StraightPath
 from uavapf.geometry import Cylinder, ObstacleSet, Sphere
 from uavapf.scenarios.io import Scenario, _check_free_start
 from uavapf.sim import SimConfig
@@ -69,8 +69,12 @@ class GeneratorParams:
     swap_min_radius: float = 5.0
     # integration (D006 realistic regime)
     dt: float = 0.01
-    t_final: float = 60.0
+    t_final: float = 60.0  # s; with a reference: path duration + ref_settle instead
     a_max: float | None = 5.0
+    # moving formation centre (T13b, D009); ref_speed None -> static slots
+    ref_speed: float | None = 1.5  # m/s
+    ref_accel: float = 0.5  # m/s²
+    ref_settle: float = 20.0  # s after the reference stops
 
 
 # --------------------------------------------------------------------------- #
@@ -336,6 +340,16 @@ def make_scenario(
         arr.flags.writeable = False
     v0 = np.zeros_like(p0)
     v0.flags.writeable = False
+    reference = None
+    t_final = prm.t_final
+    if prm.ref_speed is not None and scenario_id != "S5":  # S5 groups: two centres
+        reference = StraightPath(
+            start=tuple(nominal.mean(axis=0)),
+            goal=tuple(slots.mean(axis=0)),
+            v_ref=prm.ref_speed,
+            a_ref=prm.ref_accel,
+        )
+        t_final = reference.duration + prm.ref_settle
     shape = formation if scenario_id != "S5" else ("ring" if variant == "swap" else "line")
     name = f"{scenario_id}-{variant or 'default'}-{shape}-N{n}-s{seed}"
     scenario = Scenario(
@@ -345,9 +359,10 @@ def make_scenario(
         v0=v0,
         edges=tuple(edges),
         obstacles=tuple(obstacles),
-        sim=SimConfig(dt=prm.dt, t_final=prm.t_final, a_max=prm.a_max),
+        sim=SimConfig(dt=prm.dt, t_final=t_final, a_max=prm.a_max),
         controller=cfg,
         seed=seed,
+        reference=reference,
     )
     scenario.build_controller()  # validates slots (outside obstacles, pairs > d_s)
     return scenario
